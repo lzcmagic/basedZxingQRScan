@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
 
+import com.lzc.basedzxinglibrary.CaptureActivity;
 import com.lzc.myapplication.view.BezierView2;
 
 public class MainActivity extends AppCompatActivity {
