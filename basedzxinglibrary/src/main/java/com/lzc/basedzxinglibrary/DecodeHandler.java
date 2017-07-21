@@ -16,6 +16,7 @@
 
 package com.lzc.basedzxinglibrary;
 
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
@@ -41,11 +42,13 @@ final class DecodeHandler extends Handler {
   private final CaptureActivity activity;
   private final MultiFormatReader multiFormatReader;
   private boolean running = true;
+  private int ScreenOrientation=ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
 
-  DecodeHandler(CaptureActivity activity, Map<DecodeHintType,Object> hints) {
+  DecodeHandler(CaptureActivity activity, Map<DecodeHintType,Object> hints,int orientation) {
     multiFormatReader = new MultiFormatReader();
     multiFormatReader.setHints(hints);
     this.activity = activity;
+    this.ScreenOrientation=orientation;
   }
 
   @Override
@@ -55,7 +58,7 @@ final class DecodeHandler extends Handler {
     }
 
     if (message.what==R.id.decode){
-      decode((byte[]) message.obj, message.arg1, message.arg2);
+      decode((byte[]) message.obj, message.arg1, message.arg2,ScreenOrientation);
     }else if (message.what==R.id.quit){
       running = false;
       Looper.myLooper().quit();
@@ -70,10 +73,28 @@ final class DecodeHandler extends Handler {
    * @param width  The width of the preview frame.
    * @param height The height of the preview frame.
    */
-  private void decode(byte[] data, int width, int height) {
+  private void decode(byte[] data, int width, int height,int orientation) {
     long start = System.currentTimeMillis();
     Result rawResult = null;
+
+    if (orientation== ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            ||orientation==ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+            ||orientation==ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+            ||orientation==ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT){
+      byte[] rotatedData = new byte[data.length];
+      for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++)
+          rotatedData[x * height + height - y - 1] = data[x + y * width];
+      }
+      int tmp = width;
+      width = height;
+      height = tmp;
+      data = rotatedData;
+    }
+
+
     PlanarYUVLuminanceSource source = activity.getCameraManager().buildLuminanceSource(data, width, height);
+
     if (source != null) {
       BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
       try {

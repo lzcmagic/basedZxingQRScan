@@ -17,6 +17,7 @@
 package com.lzc.basedzxinglibrary;
 
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.os.Handler;
 import android.os.Looper;
 import android.preference.PreferenceManager;
@@ -46,13 +47,15 @@ final class DecodeThread extends Thread {
   private final Map<DecodeHintType,Object> hints;
   private Handler handler;
   private final CountDownLatch handlerInitLatch;
+  private int ScreenOrientation=ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
 
   DecodeThread(CaptureActivity activity,
                Collection<BarcodeFormat> decodeFormats,
                Map<DecodeHintType,?> baseHints,
                String characterSet,
-               ResultPointCallback resultPointCallback) {
-
+               ResultPointCallback resultPointCallback,
+                int screenOrientation) {
+this.ScreenOrientation=screenOrientation;
     this.activity = activity;
     handlerInitLatch = new CountDownLatch(1);
 
@@ -105,7 +108,7 @@ final class DecodeThread extends Thread {
   @Override
   public void run() {
     Looper.prepare();
-    handler = new DecodeHandler(activity, hints);
+    handler = new DecodeHandler(activity, hints, ScreenOrientation);
     handlerInitLatch.countDown();
     Looper.loop();
   }

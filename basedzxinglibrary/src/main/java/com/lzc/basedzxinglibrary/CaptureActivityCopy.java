@@ -78,9 +78,9 @@ import java.util.Map;
  * @author dswitkin@google.com (Daniel Switkin)
  * @author Sean Owen
  */
-public final class CaptureActivity extends AppCompatActivity implements SurfaceHolder.Callback {
+public final class CaptureActivityCopy extends AppCompatActivity implements SurfaceHolder.Callback {
 
-    private static final String TAG = CaptureActivity.class.getSimpleName();
+    private static final String TAG = CaptureActivityCopy.class.getSimpleName();
 
     private static final long DEFAULT_INTENT_RESULT_DURATION_MS = 1500L;
     private static final long BULK_MODE_SCAN_DELAY_MS = 1000L;
@@ -448,7 +448,8 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
     public void handleDecode(Result rawResult, Bitmap barcode, float scaleFactor) {
         inactivityTimer.onActivity();
         lastResult = rawResult;
-        ResultHandler resultHandler = ResultHandlerFactory.makeResultHandler(this, rawResult);
+        // FIXME: 2017/7/21 0021 
+        ResultHandler resultHandler = ResultHandlerFactory.makeResultHandler(new CaptureActivity(), rawResult);
 
         boolean fromLiveScan = barcode != null;
         if (fromLiveScan) {
@@ -729,7 +730,8 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
             cameraManager.openDriver(surfaceHolder);
             // Creating the handler starts the preview, which can also throw a RuntimeException.
             if (handler == null) {
-                handler = new CaptureActivityHandler(this, decodeFormats, decodeHints, characterSet, cameraManager,ScreenOrientation);
+                //// FIXME: 2017/7/21 0021 
+                handler = new CaptureActivityHandler(new CaptureActivity(), decodeFormats, decodeHints, characterSet, cameraManager,ScreenOrientation);
             }
             decodeOrStoreSavedBitmap(null, null);
         } catch (IOException ioe) {
