@@ -33,4 +33,9 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(MainActivity.this, CaptureActivity.class);
         startActivityForResult(intent, SCAN_CODE);
     }
+
+    public void web(View view){
+        Intent intent = new Intent(MainActivity.this, PictureScanActivity.class);
+        startActivity(intent);
+    }
 }
