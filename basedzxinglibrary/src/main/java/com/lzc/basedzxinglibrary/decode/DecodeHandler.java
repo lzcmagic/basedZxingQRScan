@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.lzc.basedzxinglibrary;
+package com.lzc.basedzxinglibrary.decode;
 
 import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
@@ -31,6 +31,8 @@ import com.google.zxing.PlanarYUVLuminanceSource;
 import com.google.zxing.ReaderException;
 import com.google.zxing.Result;
 import com.google.zxing.common.HybridBinarizer;
+import com.lzc.basedzxinglibrary.CaptureActivity;
+import com.lzc.basedzxinglibrary.R;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
@@ -57,7 +59,7 @@ final class DecodeHandler extends Handler {
       return;
     }
 
-    if (message.what==R.id.decode){
+    if (message.what== R.id.decode){
       decode((byte[]) message.obj, message.arg1, message.arg2,ScreenOrientation);
     }else if (message.what==R.id.quit){
       running = false;
@@ -77,6 +79,7 @@ final class DecodeHandler extends Handler {
     long start = System.currentTimeMillis();
     Result rawResult = null;
 
+    //手机方向为竖直方向
     if (orientation== ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             ||orientation==ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
             ||orientation==ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT

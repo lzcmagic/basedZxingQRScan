@@ -26,7 +26,6 @@ import android.view.Display;
 import android.view.Surface;
 import android.view.WindowManager;
 
-import com.lzc.basedzxinglibrary.PreferencesActivity;
 import com.lzc.basedzxinglibrary.camera.open.CameraFacing;
 import com.lzc.basedzxinglibrary.camera.open.OpenCamera;
 
@@ -161,24 +160,25 @@ final class CameraConfigurationManager {
 
     CameraConfigurationUtils.setFocus(
         parameters,
-        prefs.getBoolean(PreferencesActivity.KEY_AUTO_FOCUS, true),
-        prefs.getBoolean(PreferencesActivity.KEY_DISABLE_CONTINUOUS_FOCUS, true),
+        true,
+        true,
         safeMode);
 
     if (!safeMode) {
-      if (prefs.getBoolean(PreferencesActivity.KEY_INVERT_SCAN, false)) {
-        CameraConfigurationUtils.setInvertColor(parameters);
-      }
-
-      if (!prefs.getBoolean(PreferencesActivity.KEY_DISABLE_BARCODE_SCENE_MODE, true)) {
-        CameraConfigurationUtils.setBarcodeSceneMode(parameters);
-      }
-
-      if (!prefs.getBoolean(PreferencesActivity.KEY_DISABLE_METERING, true)) {
-        CameraConfigurationUtils.setVideoStabilization(parameters);
-        CameraConfigurationUtils.setFocusArea(parameters);
-        CameraConfigurationUtils.setMetering(parameters);
-      }
+      // FIXME: 2017/7/25 0025 
+//      if (prefs.getBoolean(PreferencesActivity.KEY_INVERT_SCAN, false)) {
+//        CameraConfigurationUtils.setInvertColor(parameters);
+//      }
+//
+//      if (!prefs.getBoolean(PreferencesActivity.KEY_DISABLE_BARCODE_SCENE_MODE, true)) {
+//        CameraConfigurationUtils.setBarcodeSceneMode(parameters);
+//      }
+//
+//      if (!prefs.getBoolean(PreferencesActivity.KEY_DISABLE_METERING, true)) {
+//        CameraConfigurationUtils.setVideoStabilization(parameters);
+//        CameraConfigurationUtils.setFocusArea(parameters);
+//        CameraConfigurationUtils.setMetering(parameters);
+//      }
 
     }
 
@@ -245,9 +245,10 @@ final class CameraConfigurationManager {
   private void doSetTorch(Camera.Parameters parameters, boolean newSetting, boolean safeMode) {
     CameraConfigurationUtils.setTorch(parameters, newSetting);
     SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-    if (!safeMode && !prefs.getBoolean(PreferencesActivity.KEY_DISABLE_EXPOSURE, true)) {
-      CameraConfigurationUtils.setBestExposure(parameters, newSetting);
-    }
+    // FIXME: 2017/7/25 0025 
+//    if (!safeMode && !prefs.getBoolean(PreferencesActivity.KEY_DISABLE_EXPOSURE, true)) {
+//      CameraConfigurationUtils.setBestExposure(parameters, newSetting);
+//    }
   }
 
 }

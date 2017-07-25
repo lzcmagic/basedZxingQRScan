@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package com.lzc.basedzxinglibrary;
+package com.lzc.basedzxinglibrary.decode;
 
 import android.content.Intent;
 import android.net.Uri;
 
 import com.google.zxing.BarcodeFormat;
+import com.lzc.basedzxinglibrary.Intents;
 
 import java.util.Arrays;
 import java.util.EnumSet;

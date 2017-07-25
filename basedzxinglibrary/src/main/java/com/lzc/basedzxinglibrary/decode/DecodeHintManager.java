@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.lzc.basedzxinglibrary;
+package com.lzc.basedzxinglibrary.decode;
 
 import android.content.Intent;
 import android.net.Uri;

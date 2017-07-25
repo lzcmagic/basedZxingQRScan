@@ -34,6 +34,7 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.Result;
 import com.lzc.basedzxinglibrary.camera.CameraManager;
+import com.lzc.basedzxinglibrary.decode.DecodeThread;
 
 import java.util.Collection;
 import java.util.Map;

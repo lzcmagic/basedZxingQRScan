@@ -38,7 +38,7 @@ import java.util.List;
  *
  * @author dswitkin@google.com (Daniel Switkin)
  */
-public final class ViewfinderQRView extends View {
+public final class ViewfinderView extends View {
 
     private static final int[] SCANNER_ALPHA = {0, 64, 128, 192, 255, 192, 128, 64};
     private static final long ANIMATION_DELAY = 80L;
@@ -58,7 +58,7 @@ public final class ViewfinderQRView extends View {
     private List<ResultPoint> lastPossibleResultPoints;
 
     // This constructor is used when the class is built from an XML resource.
-    public ViewfinderQRView(Context context, AttributeSet attrs) {
+    public ViewfinderView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
         // Initialize these once for performance rather than calling them every time in onDraw().
