@@ -244,7 +244,7 @@ public final class CameraConfigurationManager {
 
   private void doSetTorch(Camera.Parameters parameters, boolean newSetting, boolean safeMode) {
     CameraConfigurationUtils.setTorch(parameters, newSetting);
-    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+//    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
     // FIXME: 2017/7/25 0025 
 //    if (!safeMode && !prefs.getBoolean(PreferencesActivity.KEY_DISABLE_EXPOSURE, true)) {
 //      CameraConfigurationUtils.setBestExposure(parameters, newSetting);
