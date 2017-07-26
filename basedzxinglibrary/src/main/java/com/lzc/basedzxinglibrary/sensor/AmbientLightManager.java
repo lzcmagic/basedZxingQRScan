@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.lzc.basedzxinglibrary;
+package com.lzc.basedzxinglibrary.sensor;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -33,7 +33,7 @@ import com.lzc.basedzxinglibrary.camera.FrontLightMode;
  * @author Sean Owen
  * @author Nikolaus Huber
  */
-final class AmbientLightManager implements SensorEventListener {
+public final class AmbientLightManager implements SensorEventListener {
 
   private static final float TOO_DARK_LUX = 45.0f;
   private static final float BRIGHT_ENOUGH_LUX = 450.0f;
@@ -46,7 +46,7 @@ final class AmbientLightManager implements SensorEventListener {
     this.context = context;
   }
 
-  void start(CameraManager cameraManager) {
+  public void start(CameraManager cameraManager) {
     this.cameraManager = cameraManager;
     SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
     if (FrontLightMode.readPref(sharedPrefs) == FrontLightMode.AUTO) {

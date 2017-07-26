@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.lzc.basedzxinglibrary;
+package com.lzc.basedzxinglibrary.sensor;
 
 import android.app.Activity;
 import android.content.Context;
@@ -26,13 +26,16 @@ import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
+import com.lzc.basedzxinglibrary.CaptureActivity;
+import com.lzc.basedzxinglibrary.R;
+
 import java.io.Closeable;
 import java.io.IOException;
 
 /**
  * Manages beeps and vibrations for {@link CaptureActivity}.
  */
-final class BeepManager implements MediaPlayer.OnErrorListener, Closeable {
+public final class BeepManager implements MediaPlayer.OnErrorListener, Closeable {
 
   private static final String TAG = BeepManager.class.getSimpleName();
 
@@ -44,13 +47,13 @@ final class BeepManager implements MediaPlayer.OnErrorListener, Closeable {
   private boolean playBeep;
   private boolean vibrate;
 
-  BeepManager(Activity activity) {
+  public BeepManager(Activity activity) {
     this.activity = activity;
     this.mediaPlayer = null;
     updatePrefs();
   }
 
-  synchronized void updatePrefs() {
+  public synchronized void updatePrefs() {
     SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(activity);
     playBeep = shouldBeep(prefs, activity);
     // FIXME: 2017/7/25 0025
@@ -63,10 +66,23 @@ final class BeepManager implements MediaPlayer.OnErrorListener, Closeable {
     }
   }
 
-  synchronized void playBeepSoundAndVibrate() {
+  public synchronized void playBeepSoundAndVibrate() {
     if (playBeep && mediaPlayer != null) {
       mediaPlayer.start();
     }
+    if (vibrate) {
+      Vibrator vibrator = (Vibrator) activity.getSystemService(Context.VIBRATOR_SERVICE);
+      vibrator.vibrate(VIBRATE_DURATION);
+    }
+  }
+
+  public synchronized void playBeepSound(){
+    if (playBeep && mediaPlayer != null) {
+      mediaPlayer.start();
+    }
+  }
+
+  public synchronized void playVibrate(){
     if (vibrate) {
       Vibrator vibrator = (Vibrator) activity.getSystemService(Context.VIBRATOR_SERVICE);
       vibrator.vibrate(VIBRATE_DURATION);

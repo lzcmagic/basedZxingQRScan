@@ -17,45 +17,48 @@
 package com.lzc.basedzxinglibrary;
 
 import android.app.AlertDialog;
+import android.content.ContentResolver;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Message;
 import android.preference.PreferenceManager;
+import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
+import com.google.zxing.MultiFormatReader;
 import com.google.zxing.Result;
-import com.google.zxing.ResultMetadataType;
 import com.google.zxing.ResultPoint;
-import com.google.zxing.client.result.ParsedResult;
-import com.google.zxing.client.result.ParsedResultType;
 import com.google.zxing.client.result.ResultParser;
+import com.google.zxing.common.HybridBinarizer;
 import com.lzc.basedzxinglibrary.camera.CameraManager;
+import com.lzc.basedzxinglibrary.decode.BitmapLuminanceSource;
+import com.lzc.basedzxinglibrary.decode.DecodeFormatManager;
+import com.lzc.basedzxinglibrary.sensor.BeepManager;
 
+import java.io.File;
 import java.io.IOException;
-import java.text.DateFormat;
 import java.util.Collection;
-import java.util.EnumSet;
-import java.util.Map;
-
-import static com.google.zxing.client.result.ResultParser.parseResult;
+import java.util.Hashtable;
+import java.util.Vector;
 
 /**
  * This activity opens the camera and does the actual scanning on a background thread. It draws a
@@ -69,36 +72,18 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
 
     private static final String TAG = CaptureActivity.class.getSimpleName();
 
-    private static final long DEFAULT_INTENT_RESULT_DURATION_MS = 1500L;
-    private static final long BULK_MODE_SCAN_DELAY_MS = 1000L;
-
-    private static final String[] ZXING_URLS = {"http://zxing.appspot.com/scan", "zxing://scan/"};
-
-    private static final int HISTORY_REQUEST_CODE = 0x0000bacc;
-
-    private static final Collection<ResultMetadataType> DISPLAYABLE_METADATA_TYPES =
-            EnumSet.of(ResultMetadataType.ISSUE_NUMBER,
-                    ResultMetadataType.SUGGESTED_PRICE,
-                    ResultMetadataType.ERROR_CORRECTION_LEVEL,
-                    ResultMetadataType.POSSIBLE_COUNTRY);
-
     private CameraManager cameraManager;
     private CaptureActivityHandler handler;
-    private Result savedResultToShow;
     private ViewfinderView viewfinderView;
     private TextView statusView;
     private View resultView;
     private Result lastResult;
     private boolean hasSurface;
     private IntentSource source;
-    private String sourceUrl;
     private Collection<BarcodeFormat> decodeFormats;
-    private Map<DecodeHintType, ?> decodeHints;
     private String characterSet;
-    private InactivityTimer inactivityTimer;
     private BeepManager beepManager;
-    private AmbientLightManager ambientLightManager;
-    private int ScreenOrientation=ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
+    private int ScreenOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
 
     ViewfinderView getViewfinderView() {
         return viewfinderView;
@@ -108,7 +93,7 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
         return handler;
     }
 
-   public CameraManager getCameraManager() {
+    public CameraManager getCameraManager() {
         return cameraManager;
     }
 
@@ -119,11 +104,8 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(R.layout.capture);
 
-         getSupportActionBar();
         hasSurface = false;
-        inactivityTimer = new InactivityTimer(this);
         beepManager = new BeepManager(this);
-        ambientLightManager = new AmbientLightManager(this);
 
         PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
 
@@ -139,7 +121,7 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
     protected void onResume() {
         super.onResume();
 
-        Log.d(TAG,"Capture-onResume");
+        Log.d(TAG, "Capture-onResume");
         // historyManager must be initialized here to update the history preference
 
         // CameraManager must be initialized here, not in onCreate(). This is necessary because we don't
@@ -158,17 +140,14 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
         lastResult = null;
 
         int requestedOrientation = getRequestedOrientation();
-        Log.d(TAG,"requestedOrientation: "+requestedOrientation);
+        Log.d(TAG, "requestedOrientation: " + requestedOrientation);
         resetStatusView();
 
 
         beepManager.updatePrefs();
-        ambientLightManager.start(cameraManager);
 
-        inactivityTimer.onResume();
 
         source = IntentSource.NONE;
-        sourceUrl = null;
         decodeFormats = null;
         characterSet = null;
 
@@ -184,6 +163,84 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
         }
     }
 
+    public void gallery(View v) {
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
+        startActivityForResult(intent, 33);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 33 && RESULT_OK == resultCode) {
+            Uri uri = data.getData();
+
+            if (null == uri) {
+                return;
+            }
+            final String scheme = uri.getScheme();
+            String dataInfo = null;
+            if (scheme == null)
+                dataInfo = uri.getPath();
+            else if (ContentResolver.SCHEME_FILE.equals(scheme)) {
+                dataInfo = uri.getPath();
+            } else if (ContentResolver.SCHEME_CONTENT.equals(scheme)) {
+                Cursor cursor = getContentResolver().query(uri, new String[]{MediaStore.Images.ImageColumns.DATA}, null, null, null);
+                if (null != cursor) {
+                    if (cursor.moveToFirst()) {
+                        int index = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
+                        if (index > -1) {
+                            dataInfo = cursor.getString(index);
+                        }
+                    }
+                    cursor.close();
+                }
+            }
+            Log.d("lzc", "dataInfo: " + dataInfo);
+            File file = new File(dataInfo);
+
+            Bitmap mBitmap = BitmapFactory.decodeFile(file.getPath());
+            MultiFormatReader multiFormatReader = new MultiFormatReader();
+            // 解码的参数
+            Hashtable<DecodeHintType, Object> hints =
+                    new Hashtable<DecodeHintType, Object>(2);
+            // 可以解析的编码类型
+            Vector<BarcodeFormat> decodeFormats = new Vector<BarcodeFormat>();
+            if (decodeFormats == null || decodeFormats.isEmpty()) {
+                decodeFormats = new Vector<BarcodeFormat>();
+
+                // 这里设置可扫描的类型，我这里选择了都支持
+                decodeFormats.addAll(DecodeFormatManager.ONE_D_FORMATS);
+                decodeFormats.addAll(DecodeFormatManager.QR_CODE_FORMATS);
+                decodeFormats.addAll(DecodeFormatManager.DATA_MATRIX_FORMATS);
+            }
+            hints.put(DecodeHintType.POSSIBLE_FORMATS, decodeFormats);
+            // 设置继续的字符编码格式为UTF8
+            // hints.put(DecodeHintType.CHARACTER_SET, "UTF8");
+            // 设置解析配置参数
+            multiFormatReader.setHints(hints);
+
+            // 开始对图像资源解码
+            Result rawResult = null;
+            try {
+                rawResult = multiFormatReader.decodeWithState(
+                        new BinaryBitmap(
+                                new HybridBinarizer(
+                                        new BitmapLuminanceSource(mBitmap))));
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if (rawResult != null) {
+                Log.d("lzc","resultText: "+ rawResult.getText());
+            } else {
+                Log.d("lzc","resultText: 解析失败");
+            }
+        }
+    }
+
+
 
     @Override
     protected void onPause() {
@@ -191,8 +248,6 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
             handler.quitSynchronously();
             handler = null;
         }
-        inactivityTimer.onPause();
-        ambientLightManager.stop();
         beepManager.close();
         cameraManager.closeDriver();
         //historyManager = null; // Keep for onActivityResult
@@ -204,11 +259,6 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
         super.onPause();
     }
 
-    @Override
-    protected void onDestroy() {
-        inactivityTimer.shutdown();
-        super.onDestroy();
-    }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -240,22 +290,6 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
     }
 
 
-    private void decodeOrStoreSavedBitmap(Bitmap bitmap, Result result) {
-        // Bitmap isn't used yet -- will be used soon
-        if (handler == null) {
-            savedResultToShow = result;
-        } else {
-            if (result != null) {
-                savedResultToShow = result;
-            }
-            if (savedResultToShow != null) {
-                Log.d("zxcx","decodeOrStoreSavedBitmap");
-                Message message = Message.obtain(handler, R.id.decode_succeeded, savedResultToShow);
-                handler.sendMessage(message);
-            }
-            savedResultToShow = null;
-        }
-    }
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
@@ -286,17 +320,28 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
      * @param barcode     A greyscale bitmap of the camera data which was decoded.
      */
     public void handleDecode(Result rawResult, Bitmap barcode, float scaleFactor) {
-        inactivityTimer.onActivity();
-        Log.d("zxcz","handleDecode");
+        //1. barcode 被识别的条码图片
+        //2. rawResult.getBarcodeFormat().toString() 被识别条码的类型
+        //3. ResultParser.parseResult(rawResult).getType()  识别内容的类型
+        //4. rawResult.getTimestamp() 识别的时间
+        //5. ResultParser.parseResult(rawResult).getDisplayResult().replace("\r","");
+        //   被识别二维码中的内容
+
+        Log.d("lzc","type: "+rawResult.getBarcodeFormat().toString());
+        Log.d("lzc","type1: "+ ResultParser.parseResult(rawResult).getType().toString());
+        Log.d("lzc","content: "+ResultParser.parseResult(rawResult).getDisplayResult().replace("\r","").toString());
+
         lastResult = rawResult;
+
 
         boolean fromLiveScan = barcode != null;
         if (fromLiveScan) {
             // Then not from history, so beep/vibrate and we have an image to draw on
-            beepManager.playBeepSoundAndVibrate();
+            beepManager.playVibrate();
+            //绘制 识别点
             drawResultPoints(barcode, scaleFactor, rawResult);
         }
-        handleDecodeInternally(rawResult,  barcode);
+//        handleDecodeInternally(rawResult,  barcode);
     }
 
     /**
@@ -308,6 +353,7 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
      */
     private void drawResultPoints(Bitmap barcode, float scaleFactor, Result rawResult) {
         ResultPoint[] points = rawResult.getResultPoints();
+        Log.d("lzc", "points: " + points.length);
         if (points != null && points.length > 0) {
             Canvas canvas = new Canvas(barcode);
             Paint paint = new Paint();
@@ -343,92 +389,84 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
     }
 
     // Put up our own UI for how to handle the decoded contents.
-    private void handleDecodeInternally(Result rawResult,  Bitmap barcode) {
-
-
-
-        statusView.setVisibility(View.GONE);
-        viewfinderView.setVisibility(View.GONE);
-        resultView.setVisibility(View.VISIBLE);
-
-        ImageView barcodeImageView = (ImageView) findViewById(R.id.barcode_image_view);
-        if (barcode == null) {
-            barcodeImageView.setImageBitmap(BitmapFactory.decodeResource(getResources(),
-                    R.drawable.launcher_icon));
-        } else {
-            barcodeImageView.setImageBitmap(barcode);
-        }
-
-        TextView formatTextView = (TextView) findViewById(R.id.format_text_view);
-        formatTextView.setText(rawResult.getBarcodeFormat().toString());
-
-        TextView typeTextView = (TextView) findViewById(R.id.type_text_view);
-        ParsedResultType type = parseResult(rawResult).getType();
-
-        typeTextView.setText(type.toString());
-
-        DateFormat formatter = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
-        TextView timeTextView = (TextView) findViewById(R.id.time_text_view);
-        timeTextView.setText(formatter.format(rawResult.getTimestamp()));
-
-
-        TextView metaTextView = (TextView) findViewById(R.id.meta_text_view);
-        View metaTextViewLabel = findViewById(R.id.meta_text_view_label);
-        metaTextView.setVisibility(View.GONE);
-        metaTextViewLabel.setVisibility(View.GONE);
-        Map<ResultMetadataType, Object> metadata = rawResult.getResultMetadata();
-        if (metadata != null) {
-            StringBuilder metadataText = new StringBuilder(20);
-            for (Map.Entry<ResultMetadataType, Object> entry : metadata.entrySet()) {
-                if (DISPLAYABLE_METADATA_TYPES.contains(entry.getKey())) {
-                    metadataText.append(entry.getValue()).append('\n');
-                }
-            }
-            if (metadataText.length() > 0) {
-                metadataText.setLength(metadataText.length() - 1);
-                metaTextView.setText(metadataText);
-                metaTextView.setVisibility(View.VISIBLE);
-                metaTextViewLabel.setVisibility(View.VISIBLE);
-            }
-        }
-
-       ParsedResult parsedResult= ResultParser.parseResult(rawResult);
-        String contents = parsedResult.getDisplayResult().replace("\r", "");
-        CharSequence displayContents = contents;
-        TextView contentsTextView = (TextView) findViewById(R.id.contents_text_view);
-        contentsTextView.setText(displayContents);
-//        int scaledSize = Math.max(22, 32 - displayContents.length() / 4);
-//        contentsTextView.setTextSize(TypedValue.COMPLEX_UNIT_SP, scaledSize);
-
-        TextView supplementTextView = (TextView) findViewById(R.id.contents_supplement_text_view);
-        supplementTextView.setText("");
-        supplementTextView.setOnClickListener(null);
-//        if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean(
-//                PreferencesActivity.KEY_SUPPLEMENTAL, true)) {
-//            SupplementalInfoRetriever.maybeInvokeRetrieval(supplementTextView,
-//                    resultHandler.getResult(),
-//                    historyManager,
-//                    this);
+//    private void handleDecodeInternally(Result rawResult,  Bitmap barcode) {
+//
+//
+//
+//        statusView.setVisibility(View.GONE);
+//        viewfinderView.setVisibility(View.GONE);
+//        resultView.setVisibility(View.VISIBLE);
+//
+//        ImageView barcodeImageView = (ImageView) findViewById(R.id.barcode_image_view);
+//        if (barcode == null) {
+//            barcodeImageView.setImageBitmap(BitmapFactory.decodeResource(getResources(),
+//                    R.drawable.launcher_icon));
+//        } else {
+//            barcodeImageView.setImageBitmap(barcode);
 //        }
+//
+//        TextView formatTextView = (TextView) findViewById(R.id.format_text_view);
+//        formatTextView.setText(rawResult.getBarcodeFormat().toString());
+//
+//        TextView typeTextView = (TextView) findViewById(R.id.type_text_view);
+//        ParsedResultType type = ResultParser.parseResult(rawResult).getType();
+//
+//        typeTextView.setText(type.toString());
+//
+//        DateFormat formatter = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
+//        TextView timeTextView = (TextView) findViewById(R.id.time_text_view);
+//        timeTextView.setText(formatter.format(rawResult.getTimestamp()));
+//
+//
+//        TextView metaTextView = (TextView) findViewById(R.id.meta_text_view);
+//        View metaTextViewLabel = findViewById(R.id.meta_text_view_label);
+//        metaTextView.setVisibility(View.GONE);
+//        metaTextViewLabel.setVisibility(View.GONE);
+//        Map<ResultMetadataType, Object> metadata = rawResult.getResultMetadata();
+//        if (metadata != null) {
+//            StringBuilder metadataText = new StringBuilder(20);
+//            for (Map.Entry<ResultMetadataType, Object> entry : metadata.entrySet()) {
+//                if (DISPLAYABLE_METADATA_TYPES.contains(entry.getKey())) {
+//                    metadataText.append(entry.getValue()).append('\n');
+//                }
+//            }
+//            if (metadataText.length() > 0) {
+//                metadataText.setLength(metadataText.length() - 1);
+//                metaTextView.setText(metadataText);
+//                metaTextView.setVisibility(View.VISIBLE);
+//                metaTextViewLabel.setVisibility(View.VISIBLE);
+//            }
+//        }
+//
+//       ParsedResult parsedResult= ResultParser.parseResult(rawResult);
+//        String contents = parsedResult.getDisplayResult().replace("\r", "");
+//        CharSequence displayContents = contents;
+//        TextView contentsTextView = (TextView) findViewById(R.id.contents_text_view);
+//        contentsTextView.setText(displayContents);
+////        int scaledSize = Math.max(22, 32 - displayContents.length() / 4);
+////        contentsTextView.setTextSize(TypedValue.COMPLEX_UNIT_SP, scaledSize);
+//
+//        TextView supplementTextView = (TextView) findViewById(R.id.contents_supplement_text_view);
+//        supplementTextView.setText("");
+//        supplementTextView.setOnClickListener(null);
+//
+////        int buttonCount = resultHandler.getButtonCount();
+//        ViewGroup buttonView = (ViewGroup) findViewById(R.id.result_button_view);
+//        buttonView.requestFocus();
+//
+//    }
 
-//        int buttonCount = resultHandler.getButtonCount();
-        ViewGroup buttonView = (ViewGroup) findViewById(R.id.result_button_view);
-        buttonView.requestFocus();
 
-    }
-
-
-
-    private void sendReplyMessage(int id, Object arg, long delayMS) {
-        if (handler != null) {
-            Message message = Message.obtain(handler, id, arg);
-            if (delayMS > 0L) {
-                handler.sendMessageDelayed(message, delayMS);
-            } else {
-                handler.sendMessage(message);
-            }
-        }
-    }
+//    private void sendReplyMessage(int id, Object arg, long delayMS) {
+//        if (handler != null) {
+//            Message message = Message.obtain(handler, id, arg);
+//            if (delayMS > 0L) {
+//                handler.sendMessageDelayed(message, delayMS);
+//            } else {
+//                handler.sendMessage(message);
+//            }
+//        }
+//    }
 
 
     private void initCamera(SurfaceHolder surfaceHolder) {
@@ -445,12 +483,12 @@ public final class CaptureActivity extends AppCompatActivity implements SurfaceH
             if (handler == null) {
                 handler = new CaptureActivityHandler(this,
                         decodeFormats,
-                        decodeHints,
+                        null,
                         characterSet,
                         cameraManager,
                         ScreenOrientation);
             }
-            decodeOrStoreSavedBitmap(null, null);
+//            decodeOrStoreSavedBitmap(null, null);
         } catch (IOException ioe) {
             Log.w(TAG, ioe);
             displayFrameworkBugMessageAndExit();

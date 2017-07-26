@@ -35,7 +35,7 @@ import com.lzc.basedzxinglibrary.camera.open.OpenCamera;
  * configure the camera hardware.
  */
 @SuppressWarnings("deprecation") // camera APIs
-final class CameraConfigurationManager {
+public final class CameraConfigurationManager {
 
   private static final String TAG = "CameraConfiguration";
 
@@ -206,7 +206,7 @@ final class CameraConfigurationManager {
     return previewSizeOnScreen;
   }
 
-  Point getCameraResolution() {
+  public Point getCameraResolution() {
     return cameraResolution;
   }
 

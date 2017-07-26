@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.lzc.basedzxinglibrary;
+package com.lzc.basedzxinglibrary.sensor;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;
